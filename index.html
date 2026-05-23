@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <title>Configurador ALMEIDS GAMES</title>
+    <style>
+        body { 
+            font-family: 'Segoe UI', sans-serif; 
+            text-align: center; 
+            background: #101010; 
+            padding: 15px; 
+        }
+        h2 { color: #00D1FF; font-size: 20px; text-align: center; margin-bottom: 20px; }
+        .container { 
+            max-width: 450px; 
+            margin: 0 auto; 
+            background: #212121; 
+            padding: 20px; 
+            border-radius: 12px; 
+            box-shadow: 0 4px 12px #552e2e; 
+        }
+        .secao-titulo {
+            color: #fff;
+            font-size: 15px;
+            font-weight: bold;
+            text-align: center;
+            margin: 15px 0 5px 5px;
+            border-bottom: 1px solid #444;
+            padding-bottom: 5px;
+        }
+        .grid-membrana { 
+            display: grid; 
+            grid-template-columns: repeat(4, 1fr); 
+            gap: 10px; 
+            margin: 10px auto 25px auto; 
+            max-width: 420px; 
+        }
+        .grid-auxiliares { 
+            display: grid;
+            grid-template-columns: repeat(4, 1fr); 
+            gap: 10px; 
+            margin: 10px auto 25px auto; 
+            max-width: 420px; 
+        }
+        .aux-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        .aux-label {
+            color: #00D1FF;
+            font-size: 14px;
+            font-weight: bold;
+            margin-bottom: 4px;
+        }
+        select { 
+            padding: 10px 2px; 
+            text-align: center;
+            color: #fff;
+            font-size: 13px; 
+            font-weight: bold; 
+            border: 2px solid #151515; 
+            border-radius: 6px; 
+            width: 100%; 
+            box-sizing: border-box; 
+            background: #552e2e; 
+            cursor: pointer; 
+        }
+        select:focus { 
+            border-color: #007bff; 
+            outline: none; 
+        }
+        button { 
+            padding: 12px 24px; 
+            font-size: 15px; 
+            font-weight: bold; 
+            color: white; 
+            border: none; 
+            border-radius: 6px; 
+            cursor: pointer; 
+            width: 100%; 
+            margin-bottom: 10px; 
+            box-sizing: border-box; 
+        }
+        .btn-connect { background: #055cad; }
+        .btn-save { background: #28a745; }
+        button:disabled { background: #a0a0a0; cursor: not-allowed; }
+        .status { font-size: 15px; color: #fff; margin-top: 10px; font-weight: bold; }
+        optgroup { font-weight: bold; color: #007bff; background: #fff; }
+        option { color: #333; font-weight: normal; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h2>⚙️ Configurador ALMEIDS GAMES</h2>
+
+    
+    <button id="btnConnect" class="btn-connect">1. Conectar via Porta USB</button>
+    <button id="btnSave" class="btn-save" disabled>2. Gravar Configuração</button>
+    
+    <div class="secao-titulo">⌨️ Escolha a função de cada botão de seu teclado. ⌨️</div>
+    <div class="grid-membrana" id="gridMembrana"></div>
+
+    <div class="secao-titulo">🕹️ Botões Auxiliares (GP1 ao GP4 no GND)</div>
+    <div class="grid-auxiliares" id="gridAuxiliares"></div>
+    
+    <div id="statusLabel" class="status">Status: Desconectado</div>
+</div>
+
+<script>
+    let port;
+    let textBuffer = "";
+    const gridMembrana = document.getElementById('gridMembrana');
+    const gridAuxiliares = document.getElementById('gridAuxiliares');
+    const statusLabel = document.getElementById('statusLabel');
+    const btnSave = document.getElementById('btnSave');
+
+    const gruposTeclas = {
+        "Letras": ["A","B","C","D","E","F","G","H","I","J","K","L","M","N","O","P","Q","R","S","T","U","V","W","X","Y","Z"],
+        "Números (Topo)": ["1","2","3","4","5","6","7","8","9","0"],
+        "Teclado Numérico (Numpad)": [
+            {v: "[N1]", t: "1 Numpd"}, {v: "[N2]", t: "2 Numpd"}, {v: "[N3]", t: "3 Numpd"},
+            {v: "[N4]", t: "4 Numpd"}, {v: "[N5]", t: "5 Numpd"}, {v: "[N6]", t: "6 Numpd"},
+            {v: "[N7]", t: "7 Numpd"}, {v: "[N8]", t: "8 Numpd"}, {v: "[N9]", t: "9 Numpd"},
+            {v: "[N0]", t: "0 Numpd"}, {v: "[NENT]", t: "↵ Enter Dir."}, {v: "[NBAR]", t: "/ Numpd"},
+            {v: "[NMAI]", t: "+ Numpd"}, {v: "[NMEN]", t: "- Numpd"}, {v: "[NPNT]", t: ". Numpd"}
+        ],
+        "Navegação / Seta": [
+            {v: "[CIM]", t: "↑ Seta Cima"}, {v: "[BAI]", t: "↓ Seta Baixo"},
+            {v: "[ESQ]", t: "← Seta Esq"},  {v: "[DIR]", t: "→ Seta Dir"}
+        ],
+        "Sistema / Controle": [
+            {v: "[ENT]", t: "↵ Enter Esq"},      {v: "[ESC]", t: "⎋ Esc"},
+            {v: "[BS]",  t: "⌫ Backspace"},  {v: "[SPC]", t: "⌴ Espaço"},
+            {v: "[TAB]", t: "⇥ Tab"},        {v: "[DEL]", t: "␡ Delete"},
+            {v: "[CAPS]",t: "⇪ Caps Lock"},  {v: "[PRT]", t: "⎙ Print Screen"},
+            {v: "[LCT]", t: "Ctrl (Esq)"},   {v: "[LSH]", t: "Shift (Esq)"},
+            {v: "[LAL]", t: "Alt (Esq)"},    {v: "[GUI]", t: "Win / Cmd"}
+        ],
+        "Teclas de Função": ["F1","F2","F3","F4","F5","F6","F7","F8","F9","F10","F11","F12"],
+        "Símbolos Seguros": [
+            "*", "#", "-", "=", "[", "]", ";", "'",
+            {v: "[VIR]", t: ", Vírgula"},
+            {v: "[PNT]", t: ". Ponto"},
+            {v: "[BAR]", t: "/ Barra"}
+        ]
+    };
+
+    function gerarSelectHtml(id, pinLabel = "") {
+        let html = "";
+        if (pinLabel) {
+            html += `<div class="aux-item"><span class="aux-label">${pinLabel}</span>`;
+        }
+        html += `<select id="${id}">`;
+        for (const [grupo, itens] of Object.entries(gruposTeclas)) {
+            html += `<optgroup label="${grupo}">`;
+            itens.forEach(item => {
+                let valor = typeof item === 'object' ? item.v : item;
+                let texto = typeof item === 'object' ? item.t : item;
+                html += `<option value="${valor}">${texto}</option>`;
+            });
+            html += `</optgroup>`;
+        }
+        html += `</select>`;
+        if (pinLabel) {
+            html += `</div>`;
+        }
+        return html;
+    }
+
+    for(let i = 0; i < 16; i++) {
+        gridMembrana.innerHTML += gerarSelectHtml(`k${i}`);
+    }
+
+    for(let i = 16; i < 20; i++) {
+        let gpNum = i - 15;
+        gridAuxiliares.innerHTML += gerarSelectHtml(`k${i}`, `GP0${gpNum}`);
+    }
+
+    document.getElementById('btnConnect').addEventListener('click', async () => {
+        try {
+            port = await navigator.serial.requestPort();
+            await port.open({ baudRate: 115200 });
+            
+            statusLabel.innerText = "Status: Conectado! Obtendo dados...";
+            btnSave.disabled = false;
+            readSerialLoop();
+
+            setTimeout(async () => {
+                const encoder = new TextEncoder();
+                const writer = port.writable.getWriter();
+                await writer.write(encoder.encode("READ\n"));
+                writer.releaseLock();
+            }, 400);
+
+        } catch (err) {
+            statusLabel.innerText = "Status: Falha ao conectar.";
+            alert("Erro de conexão: " + err);
+        }
+    });
+
+    async function readSerialLoop() {
+        const decoder = new TextDecoder();
+        while (port.readable) {
+            const reader = port.readable.getReader();
+            try {
+                while (true) {
+                    const { value, done } = await reader.read();
+                    if (done) break;
+                    
+                    textBuffer += decoder.decode(value);
+                    
+                    if (textBuffer.includes("CURRENT:")) {
+                        const markerIndex = textBuffer.indexOf("CURRENT:");
+                        let restData = textBuffer.substring(markerIndex + 8);
+                        
+                        if (restData.includes("\n")) {
+                            let parts = restData.split("\n");
+                            let cleanLine = parts[0].trim();
+                            textBuffer = parts.slice(1).join("\n");
+                            
+                            let currentKeys = cleanLine.split(",");
+                            if (currentKeys.length === 20) {
+                                for(let i = 0; i < 20; i++) {
+                                    let el = document.getElementById(`k${i}`);
+                                    if (el) el.value = currentKeys[i].trim();
+                                }
+                                statusLabel.innerText = "Status: Configuração carregada!";
+                            }
+                        }
+                    }
+                }
+            } catch (error) {
+                console.error(error);
+            } finally {
+                reader.releaseLock();
+            }
+            await new Promise(resolve => setTimeout(resolve, 50));
+        }
+    }
+
+    document.getElementById('btnSave').addEventListener('click', async () => {
+        let keysArray = [];
+        for(let i = 0; i < 20; i++) {
+            let el = document.getElementById(`k${i}`);
+            keysArray.push(el ? el.value : "");
+        }
+        let configString = keysArray.join(",");
+        
+        try {
+            const encoder = new TextEncoder();
+            const writer = port.writable.getWriter();
+            await writer.write(encoder.encode(`SAVE:${configString}\n`));
+            writer.releaseLock();
+            
+            statusLabel.innerText = "Status: Modificações gravadas com sucesso!";
+            alert("Sucesso! Novo layout de 20 teclas gravado na Pico.");
+        } catch (err) {
+            alert("Erro ao salvar dados: " + err);
+        }
+    });
+</script>
+</body>
+</html>
